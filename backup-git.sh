@@ -15,13 +15,34 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 set -eux
+
+BACKUPALL=0
 GITDIR=/home/git
 TEMPDIR=/tmp
 
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 BUCKETNAME"
+usage() {
+  echo "Usage: $0 [-a] BUCKETNAME"
   exit 1
+}
+
+if [ $# -lt 1 ]; then
+  usage
 fi
+
+
+while getopts ":ah" opt; do
+  case $opt in
+    a)
+      BACKUPALL=1
+      ;;
+    h)
+      usage
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
 
 BUCKET="$1"
 
@@ -47,10 +68,18 @@ upload() {
 
 # If hashes.txt exists, only upload files whose hashes have changed. Otherwise,
 # upload everything.
-if [ -f hashes.txt ]; then
-    upload "$(sha1sum -c hashes.txt 2>/dev/null | awk -F: '/FAILED/ {print $1}')"
+if [ "$BACKUPALL" -ne 0 ] || [ ! -f hashes.txt ]; then
+  upload *.git.tar.xz
 else
-    upload ./*.git.tar.xz
+  # Upload anything whose hash has changed.
+  upload $(sha1sum -c hashes.txt 2>/dev/null | awk -F: '/FAILED/ {print $1}')
+
+  # Upload new repos, which are not yet in hashes.txt
+  for f in *.git.tar.xz; do
+    if [ $(egrep -c "\\b$f\$" hashes.txt) -eq 0 ]; then
+      upload "$f"
+    fi
+  done
 fi
 
 # Write out the new file hashes for the next run.
