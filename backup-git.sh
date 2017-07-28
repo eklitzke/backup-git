@@ -47,7 +47,7 @@ done
 BUCKET="$1"
 
 # Renice ourselves
-renice -n 10 $$
+renice -n 10 $$ &>/dev/null
 
 # Clean things up when we're done
 trap 'rm -f ${TEMPDIR}/*.git.tar.xz' EXIT
